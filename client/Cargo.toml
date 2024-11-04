@@ -1,0 +1,14 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winit = "0.30"
+softbuffer = "0.4"
+
+[dependencies.image]
+version = "0.25.0"
+# Disable rayon on web
+default-features = false
+features = ["jpeg"]
