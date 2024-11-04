@@ -1,0 +1,15 @@
+[package]
+name = "Yarden"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+
+[[bin]]
+name = "client"
+src = "src/bin/client.rs"
+
+[[bin]]
+name = "server"
+src = "src/bin/server.rs"
