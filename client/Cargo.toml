@@ -6,9 +6,11 @@ edition = "2021"
 [dependencies]
 winit = "0.30"
 softbuffer = "0.4"
+yarden = { path = "../../Yarden" }
+ffmpeg-sidecar = "2.0.0"
 
-[dependencies.image]
-version = "0.25.0"
-# Disable rayon on web
-default-features = false
-features = ["jpeg"]
+[profile.dev]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 3
