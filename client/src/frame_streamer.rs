@@ -1,8 +1,7 @@
 pub trait FrameStreamer {
-    type Frame;
+    type Frame: Frame;
     fn metadata(&self) -> FrameStreamerMetaData;
     fn next_frame(&mut self) -> Option<Self::Frame>;
-
     fn fps(&self) -> usize {
         self.metadata().fps
     }
@@ -14,6 +13,7 @@ pub trait FrameStreamer {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct FrameStreamerMetaData {
     pub fps: usize,
     pub frame_width: u32,
@@ -21,8 +21,8 @@ pub struct FrameStreamerMetaData {
 }
 
 pub trait Frame {
-    type Pixel;
-    fn pixels(&self) -> impl Iterator<Item = (u32, u32, Self::Pixel)>;
+    /// Must output BGRZ
+    fn bgrz_pixels(&self) -> &[u8];
     fn width(&self) -> u32;
     fn height(&self) -> u32;
 }

@@ -4,13 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ffmpeg = { package = "ffmpeg-next", version = "7" }
 winit = "0.30"
 softbuffer = "0.4"
 yarden = { path = "../../Yarden" }
-ffmpeg-sidecar = "2.0.0"
-
-[profile.dev]
-opt-level = 3
-
-[profile.dev.package."*"]
-opt-level = 3
