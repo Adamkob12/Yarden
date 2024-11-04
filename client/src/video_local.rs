@@ -64,7 +64,7 @@ impl LocalVideo {
         }
     }
 
-    pub fn next_frame(&mut self) -> Option<Video> {
+    pub fn poll_next_frame(&mut self) -> Option<Video> {
         for (stream, packet) in self.ictx.packets() {
             if stream.index() == self.video_stream_index {
                 self.decoder.send_packet(&packet).unwrap();
@@ -102,6 +102,6 @@ impl FrameStreamer for LocalVideo {
         self.metadata
     }
     fn next_frame(&mut self) -> Option<Self::Frame> {
-        self.next_frame()
+        self.poll_next_frame()
     }
 }

@@ -5,11 +5,13 @@ use frame_streamer::{Frame, FrameStreamer};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::rc::Rc;
+use std::thread::yield_now;
 use std::time::Instant;
 use video_local::LocalVideo;
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
 struct App<F: FrameStreamer> {
@@ -19,6 +21,7 @@ struct App<F: FrameStreamer> {
     _start_time: Instant,
     prev_frame: Instant,
     frame_streamer: F,
+    is_paused: bool,
 }
 
 impl App<LocalVideo> {
@@ -30,6 +33,7 @@ impl App<LocalVideo> {
             _start_time: Instant::now(),
             prev_frame: Instant::now(),
             frame_streamer: LocalVideo::new(video_path),
+            is_paused: false,
         }
     }
 }
@@ -67,10 +71,23 @@ impl<F: FrameStreamer> ApplicationHandler for App<F> {
                 println!("The close button was pressed; stopping");
                 event_loop.exit();
             }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if !event.repeat
+                    && event.state == ElementState::Pressed
+                    && event.physical_key == PhysicalKey::Code(winit::keyboard::KeyCode::Space)
+                {
+                    self.is_paused = !self.is_paused;
+                }
+            }
             WindowEvent::RedrawRequested => {
                 while Instant::now().duration_since(self.prev_frame).as_millis()
                     < (1000 / self.frame_streamer.fps() as u128)
-                {}
+                    || self.is_paused
+                {
+                    yield_now();
+                    self.window.as_ref().unwrap().request_redraw();
+                    return;
+                }
                 self.prev_frame = Instant::now();
 
                 let mut buff = self.surface.as_mut().unwrap().buffer_mut().unwrap();
@@ -79,6 +96,7 @@ impl<F: FrameStreamer> ApplicationHandler for App<F> {
                     if let Some(x) = self.frame_streamer.next_frame() {
                         break x;
                     }
+                    yield_now();
                 };
                 let frame_data = frame.bgrz_pixels();
                 unsafe {
@@ -100,11 +118,6 @@ impl<F: FrameStreamer> ApplicationHandler for App<F> {
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();
-
-    // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
-    // dispatched any events. This is ideal for games and similar applications.
-    event_loop.set_control_flow(ControlFlow::Poll);
-
     // ControlFlow::Wait pauses the event loop if no events are available to process.
     // This is ideal for non-game applications that only update in response to user
     // input, and uses significantly less power/CPU time than ControlFlow::Poll.
