@@ -23,6 +23,8 @@ pub struct FrameStreamerMetaData {
 pub trait Frame {
     /// Must output BGRZ
     fn bgrz_pixels(&self) -> &[u8];
+    #[allow(unused)]
     fn width(&self) -> u32;
+    #[allow(unused)]
     fn height(&self) -> u32;
 }
