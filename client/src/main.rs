@@ -103,6 +103,8 @@ impl ApplicationHandler for App<LocalVideo> {
                     || self.is_paused
                 {
                     yield_now();
+                    self.window.as_ref().unwrap().request_redraw();
+                    return;
                 }
                 self.prev_frame = Instant::now();
 
@@ -132,7 +134,7 @@ impl ApplicationHandler for App<LocalVideo> {
                 self.window.as_ref().unwrap().request_redraw();
                 return;
             }
-            _ => (),
+            _ => {}
         }
     }
 }
