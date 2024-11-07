@@ -5,20 +5,19 @@ use frame_streamer::{VideoFrame, VideoStreamer};
 use rodio::{OutputStream, Sink};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
-use std::rc::Rc;
 use std::thread::yield_now;
 use std::time::Instant;
 use video_local::LocalVideo;
-use winit::application::ApplicationHandler;
-use winit::event::{ElementState, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::PhysicalKey;
-use winit::window::{Window, WindowId};
+use winit::dpi::PhysicalSize;
+use winit::event::Event;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
+use winit_input_helper::WinitInputHelper;
 
 struct App<F: VideoStreamer> {
-    window: Option<Rc<Window>>,
-    context: Option<Context<Rc<Window>>>,
-    surface: Option<Surface<Rc<Window>, Rc<Window>>>,
+    window: Window,
+    context: Option<Context>,
+    surface: Option<Surface>,
     _start_time: Instant,
     prev_frame: Instant,
     frame_streamer: F,
@@ -30,16 +29,28 @@ struct App<F: VideoStreamer> {
 }
 
 impl App<LocalVideo> {
-    pub fn new_local(video_path: &'static str) -> App<LocalVideo> {
+    pub fn new_local(video_path: &'static str, window: Window) -> App<LocalVideo> {
+        let frame_streamer = LocalVideo::new(video_path);
+        let context = unsafe { softbuffer::Context::new(&window).unwrap() };
+        let mut surface = unsafe { softbuffer::Surface::new(&context, &window).unwrap() };
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        surface
+            .resize(
+                NonZeroU32::new(frame_streamer.frame_width()).unwrap(),
+                NonZeroU32::new(frame_streamer.frame_height()).unwrap(),
+            )
+            .unwrap();
+        window.set_inner_size(PhysicalSize::new(
+            frame_streamer.frame_width(),
+            frame_streamer.frame_height(),
+        ));
         App {
-            window: None,
-            context: None,
-            surface: None,
+            window,
+            context: Some(context),
+            surface: Some(surface),
             _start_time: Instant::now(),
             prev_frame: Instant::now(),
-            frame_streamer: LocalVideo::new(video_path),
-            // stream_handle,
+            frame_streamer,
             _stream,
             is_paused: false,
             is_muted: false,
@@ -49,76 +60,37 @@ impl App<LocalVideo> {
     }
 }
 
-impl ApplicationHandler for App<LocalVideo> {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = Rc::new(
-            event_loop
-                .create_window(Window::default_attributes().with_inner_size(
-                    winit::dpi::PhysicalSize::new(
-                        self.frame_streamer.frame_width(),
-                        self.frame_streamer.frame_height(),
-                    ),
-                ))
-                .unwrap(),
-        );
-        let context = Context::new(Rc::clone(&window)).unwrap();
-        let mut surface = Surface::new(&context, Rc::clone(&window)).unwrap();
+fn main() {
+    let mut input = WinitInputHelper::new();
+    let event_loop = EventLoop::new();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    window.set_title("Video Player");
 
-        surface
-            .resize(
-                NonZeroU32::new(self.frame_streamer.frame_width()).unwrap(),
-                NonZeroU32::new(self.frame_streamer.frame_height()).unwrap(),
-            )
-            .unwrap();
-
-        self.context = Some(context);
-        self.surface = Some(surface);
-        self.window = Some(window);
-    }
-
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+    let mut app = App::new_local("assets/test1.mp4", window);
+    event_loop.run(move |event, _, control_flow| {
+        control_flow.set_wait();
         match event {
-            WindowEvent::CloseRequested => {
-                println!("The close button was pressed; stopping");
-                event_loop.exit();
-            }
-            WindowEvent::KeyboardInput { event, .. } => {
-                if !event.repeat
-                    && event.state == ElementState::Pressed
-                    && event.physical_key == PhysicalKey::Code(winit::keyboard::KeyCode::Space)
-                {
-                    self.is_paused = !self.is_paused;
-                } else if !event.repeat
-                    && event.state == ElementState::Pressed
-                    && event.physical_key == PhysicalKey::Code(winit::keyboard::KeyCode::KeyM)
-                {
-                    self.is_muted = !self.is_muted;
-                    self.sink
-                        .set_volume(if self.is_muted { 0.0 } else { self.volume });
-                }
-            }
-            WindowEvent::RedrawRequested => {
-                while Instant::now().duration_since(self.prev_frame).as_millis()
-                    < (1000 / self.frame_streamer.fps() as u128)
-                    || self.is_paused
+            Event::RedrawRequested(_window_id) => {
+                while Instant::now().duration_since(app.prev_frame).as_millis()
+                    < (1000 / app.frame_streamer.fps() as u128)
+                    || app.is_paused
                 {
                     yield_now();
-                    self.window.as_ref().unwrap().request_redraw();
+                    app.window.request_redraw();
                     return;
                 }
-                self.prev_frame = Instant::now();
-
-                let mut buff = self.surface.as_mut().unwrap().buffer_mut().unwrap();
+                app.prev_frame = Instant::now();
+                let mut buff = app.surface.as_mut().unwrap().buffer_mut().unwrap();
 
                 let video_frame = loop {
-                    if let Some(x) = self.frame_streamer.next_frame() {
+                    if let Some(x) = app.frame_streamer.next_frame() {
                         break x;
                     }
                     yield_now();
                 };
 
-                let audio_source = self.frame_streamer._poll_audio().unwrap();
-                let audio_source2 = self.frame_streamer._poll_audio().unwrap();
+                let audio_source = app.frame_streamer._poll_audio().unwrap();
+                let audio_source2 = app.frame_streamer._poll_audio().unwrap();
 
                 let frame_data = video_frame.bgrz_pixels();
                 unsafe {
@@ -128,24 +100,17 @@ impl ApplicationHandler for App<LocalVideo> {
                         frame_data.len(),
                     )
                 };
-                self.sink.append(audio_source);
-                self.sink.append(audio_source2);
+                app.sink.append(audio_source);
+                app.sink.append(audio_source2);
                 buff.present().unwrap();
-                self.window.as_ref().unwrap().request_redraw();
-                return;
             }
             _ => {}
         }
-    }
-}
 
-fn main() {
-    let event_loop = EventLoop::new().unwrap();
-    // ControlFlow::Wait pauses the event loop if no events are available to process.
-    // This is ideal for non-game applications that only update in response to user
-    // input, and uses significantly less power/CPU time than ControlFlow::Poll.
-    event_loop.set_control_flow(ControlFlow::Wait);
+        if input.update(&event) {
+            return;
+        }
 
-    let mut app = App::new_local("assets/test1.mp4");
-    event_loop.run_app(&mut app).unwrap();
+        // app.window.request_redraw();
+    });
 }
