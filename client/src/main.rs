@@ -2,7 +2,7 @@ mod frame_streamer;
 mod video_local;
 
 use frame_streamer::{VideoFrame, VideoStreamer};
-use rodio::{OutputStream, OutputStreamHandle, Sink, Source};
+use rodio::{OutputStream, Sink};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -22,8 +22,7 @@ struct App<F: VideoStreamer> {
     _start_time: Instant,
     prev_frame: Instant,
     frame_streamer: F,
-    // stream_handle: OutputStreamHandle,
-    stream: OutputStream,
+    _stream: OutputStream,
     is_paused: bool,
     is_muted: bool,
     volume: f32,
@@ -32,7 +31,7 @@ struct App<F: VideoStreamer> {
 
 impl App<LocalVideo> {
     pub fn new_local(video_path: &'static str) -> App<LocalVideo> {
-        let (stream, stream_handle) = OutputStream::try_default().unwrap();
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         App {
             window: None,
             context: None,
@@ -41,7 +40,7 @@ impl App<LocalVideo> {
             prev_frame: Instant::now(),
             frame_streamer: LocalVideo::new(video_path),
             // stream_handle,
-            stream,
+            _stream,
             is_paused: false,
             is_muted: false,
             volume: 1.0,
