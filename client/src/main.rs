@@ -69,7 +69,7 @@ impl App<LocalVideo> {
             if self.is_muted {
                 println!("MUTED")
             } else {
-                println!("VOLUME: {}", self.volume)
+                println!("VOLUME: {:.1}", self.volume)
             }
         }
         if input.key_pressed(winit::event::VirtualKeyCode::Space) {
@@ -82,24 +82,24 @@ impl App<LocalVideo> {
         }
         if input.held_shift() && input.key_pressed(winit::event::VirtualKeyCode::Period) {
             self.speed += 0.25;
-            println!("SPEED: {}", self.speed);
+            println!("SPEED: {:.1}", self.speed);
             self.sink.set_speed(self.speed);
         }
         if input.held_shift() && input.key_pressed(winit::event::VirtualKeyCode::Comma) {
             self.speed -= 0.25;
             self.speed = self.speed.abs();
-            println!("SPEED: {}", self.speed);
+            println!("SPEED: {:.1}", self.speed);
             self.sink.set_speed(self.speed);
         }
         if input.key_pressed(winit::event::VirtualKeyCode::Up) {
-            self.volume += 0.25;
-            println!("VOLUME: {}", self.volume);
+            self.volume += 0.05;
+            println!("VOLUME: {:.1}", self.volume);
             self.sink.set_volume(self.volume);
         }
         if input.key_pressed(winit::event::VirtualKeyCode::Down) {
-            self.volume -= 0.25;
+            self.volume -= 0.05;
             self.volume = self.volume.abs();
-            println!("VOLUME: {}", self.volume);
+            println!("VOLUME: {:.1}", self.volume);
             self.sink.set_volume(self.volume);
         }
     }
