@@ -1,7 +1,8 @@
 mod frame_streamer;
 mod video_local;
 
-use frame_streamer::{Frame, FrameStreamer};
+use frame_streamer::{VideoFrame, VideoStreamer};
+use rodio::{OutputStream, OutputStreamHandle, Sink, Source};
 use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -14,18 +15,22 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Window, WindowId};
 
-struct App<F: FrameStreamer> {
+struct App<F: VideoStreamer> {
     window: Option<Rc<Window>>,
     context: Option<Context<Rc<Window>>>,
     surface: Option<Surface<Rc<Window>, Rc<Window>>>,
     _start_time: Instant,
     prev_frame: Instant,
     frame_streamer: F,
+    // stream_handle: OutputStreamHandle,
+    stream: OutputStream,
     is_paused: bool,
+    sink: Sink,
 }
 
 impl App<LocalVideo> {
     pub fn new_local(video_path: &'static str) -> App<LocalVideo> {
+        let (stream, stream_handle) = OutputStream::try_default().unwrap();
         App {
             window: None,
             context: None,
@@ -33,12 +38,15 @@ impl App<LocalVideo> {
             _start_time: Instant::now(),
             prev_frame: Instant::now(),
             frame_streamer: LocalVideo::new(video_path),
+            // stream_handle,
+            stream,
             is_paused: false,
+            sink: Sink::try_new(&stream_handle).unwrap(),
         }
     }
 }
 
-impl<F: FrameStreamer> ApplicationHandler for App<F> {
+impl ApplicationHandler for App<LocalVideo> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window = Rc::new(
             event_loop
@@ -92,13 +100,17 @@ impl<F: FrameStreamer> ApplicationHandler for App<F> {
 
                 let mut buff = self.surface.as_mut().unwrap().buffer_mut().unwrap();
 
-                let frame = loop {
+                let video_frame = loop {
                     if let Some(x) = self.frame_streamer.next_frame() {
                         break x;
                     }
                     yield_now();
                 };
-                let frame_data = frame.bgrz_pixels();
+
+                let audio_source = self.frame_streamer._poll_audio().unwrap();
+                let audio_source2 = self.frame_streamer._poll_audio().unwrap();
+
+                let frame_data = video_frame.bgrz_pixels();
                 unsafe {
                     core::ptr::copy_nonoverlapping(
                         frame_data.as_ptr(),
@@ -106,9 +118,9 @@ impl<F: FrameStreamer> ApplicationHandler for App<F> {
                         frame_data.len(),
                     )
                 };
-
+                self.sink.append(audio_source);
+                self.sink.append(audio_source2);
                 buff.present().unwrap();
-                //
                 self.window.as_ref().unwrap().request_redraw();
             }
             _ => (),

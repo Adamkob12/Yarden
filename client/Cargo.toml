@@ -8,3 +8,4 @@ ffmpeg = { package = "ffmpeg-next", version = "7" }
 winit = "0.30"
 softbuffer = "0.4"
 yarden = { path = "../../Yarden" }
+rodio = "0.19.0"
