@@ -25,6 +25,8 @@ struct App<F: VideoStreamer> {
     // stream_handle: OutputStreamHandle,
     stream: OutputStream,
     is_paused: bool,
+    is_muted: bool,
+    volume: f32,
     sink: Sink,
 }
 
@@ -41,6 +43,8 @@ impl App<LocalVideo> {
             // stream_handle,
             stream,
             is_paused: false,
+            is_muted: false,
+            volume: 1.0,
             sink: Sink::try_new(&stream_handle).unwrap(),
         }
     }
@@ -85,6 +89,13 @@ impl ApplicationHandler for App<LocalVideo> {
                     && event.physical_key == PhysicalKey::Code(winit::keyboard::KeyCode::Space)
                 {
                     self.is_paused = !self.is_paused;
+                } else if !event.repeat
+                    && event.state == ElementState::Pressed
+                    && event.physical_key == PhysicalKey::Code(winit::keyboard::KeyCode::KeyM)
+                {
+                    self.is_muted = !self.is_muted;
+                    self.sink
+                        .set_volume(if self.is_muted { 0.0 } else { self.volume });
                 }
             }
             WindowEvent::RedrawRequested => {
@@ -93,8 +104,6 @@ impl ApplicationHandler for App<LocalVideo> {
                     || self.is_paused
                 {
                     yield_now();
-                    self.window.as_ref().unwrap().request_redraw();
-                    return;
                 }
                 self.prev_frame = Instant::now();
 
@@ -122,6 +131,7 @@ impl ApplicationHandler for App<LocalVideo> {
                 self.sink.append(audio_source2);
                 buff.present().unwrap();
                 self.window.as_ref().unwrap().request_redraw();
+                return;
             }
             _ => (),
         }

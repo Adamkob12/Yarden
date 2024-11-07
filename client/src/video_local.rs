@@ -14,7 +14,7 @@ use ffmpeg::{
 };
 use std::{collections::VecDeque, path::PathBuf, time::Duration};
 
-const SAMPLE_RATE: u32 = 52100;
+const SAMPLE_RATE: u32 = 51200;
 
 pub struct LocalVideo {
     #[allow(unused)]
@@ -107,10 +107,10 @@ impl LocalVideo {
 
     pub fn buffer_packets(&mut self) {
         for (i, (stream, packet)) in self.ictx.packets().enumerate() {
-            if stream.index() == self.video_stream_index {
-                self.video_packet_buffer.push_back(packet);
-            } else if stream.index() == self.audio_stream_index {
+            if stream.index() == self.audio_stream_index {
                 self.audio_packet_buffer.push_back(packet);
+            } else if stream.index() == self.video_stream_index {
+                self.video_packet_buffer.push_back(packet);
             }
             if i > 10 {
                 break;
