@@ -82,13 +82,13 @@ impl App<LocalVideo> {
         }
         if input.held_shift() && input.key_pressed(winit::event::VirtualKeyCode::Period) {
             self.speed += 0.25;
-            println!("SPEED: {:.1}", self.speed);
+            println!("SPEED: {:.2}", self.speed);
             self.sink.set_speed(self.speed);
         }
         if input.held_shift() && input.key_pressed(winit::event::VirtualKeyCode::Comma) {
             self.speed -= 0.25;
             self.speed = self.speed.abs();
-            println!("SPEED: {:.1}", self.speed);
+            println!("SPEED: {:.2}", self.speed);
             self.sink.set_speed(self.speed);
         }
         if input.key_pressed(winit::event::VirtualKeyCode::Up) {
@@ -144,12 +144,11 @@ fn main() {
                         )
                     };
 
-                    if let (Some(audio_source1), Some(audio_source2)) = (
-                        app.frame_streamer.poll_audio(),
-                        app.frame_streamer.poll_audio(),
-                    ) {
-                        app.sink.append(audio_source1);
-                        app.sink.append(audio_source2);
+                    if let Some(audio_source) = app.frame_streamer.poll_audio() {
+                        app.sink.append(audio_source);
+                    }
+                    if let Some(audio_source) = app.frame_streamer.poll_audio() {
+                        app.sink.append(audio_source);
                     }
 
                     buff.present().unwrap();
