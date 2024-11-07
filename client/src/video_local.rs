@@ -118,41 +118,55 @@ impl LocalVideo {
         }
     }
 
-    pub fn poll_next_frame(&mut self) -> Option<Video> {
-        if let Some(packet) = self.video_packet_buffer.pop_front() {
-            self.video_decoder.send_packet(&packet).unwrap();
+    pub fn next_audio_packet(&mut self) -> Option<Packet> {
+        if let Some(packet) = self.audio_packet_buffer.pop_front() {
+            return Some(packet);
         } else {
             self.buffer_packets();
-            return self.poll_next_frame();
+            return self.audio_packet_buffer.pop_front();
         }
-        let mut decoded = Video::empty();
-        self.video_decoder.receive_frame(&mut decoded).ok()?;
-        debug_assert_eq!(decoded.width(), self.metadata.frame_width);
-        debug_assert_eq!(decoded.height(), self.metadata.frame_height);
-        let mut rgb_frame = Video::empty();
-        self.scaler.run(&decoded, &mut rgb_frame).unwrap();
-        self.current_frame += 1;
-
-        Some(rgb_frame)
     }
 
-    pub fn _poll_audio(&mut self) -> Option<SampleIter> {
-        if let Some(packet) = self.audio_packet_buffer.pop_front() {
-            self.audio_decoder.send_packet(&packet).unwrap();
+    pub fn next_video_packet(&mut self) -> Option<Packet> {
+        if let Some(packet) = self.video_packet_buffer.pop_front() {
+            return Some(packet);
         } else {
             self.buffer_packets();
-            return self._poll_audio();
+            return self.video_packet_buffer.pop_front();
         }
-        let mut decoded = Audio::empty();
-        self.audio_decoder.receive_frame(&mut decoded).ok()?;
-        let mut resampled = Audio::empty();
-        self.resampler.run(&decoded, &mut resampled).unwrap();
-        debug_assert_eq!(self.audio_metadata.sample_rate, resampled.rate());
+    }
 
-        Some(SampleIter {
-            audio: resampled,
-            sample_idx: 0,
-        })
+    pub fn poll_next_frame(&mut self) -> Option<Video> {
+        if let Some(packet) = self.next_video_packet() {
+            self.video_decoder.send_packet(&packet).unwrap();
+            let mut decoded = Video::empty();
+            self.video_decoder.receive_frame(&mut decoded).ok()?;
+            debug_assert_eq!(decoded.width(), self.metadata.frame_width);
+            debug_assert_eq!(decoded.height(), self.metadata.frame_height);
+            let mut rgb_frame = Video::empty();
+            self.scaler.run(&decoded, &mut rgb_frame).unwrap();
+            self.current_frame += 1;
+
+            return Some(rgb_frame);
+        }
+        None
+    }
+
+    pub fn poll_audio(&mut self) -> Option<SampleIter> {
+        if let Some(packet) = self.next_audio_packet() {
+            self.audio_decoder.send_packet(&packet).unwrap();
+            let mut decoded = Audio::empty();
+            self.audio_decoder.receive_frame(&mut decoded).ok()?;
+            let mut resampled = Audio::empty();
+            self.resampler.run(&decoded, &mut resampled).unwrap();
+            debug_assert_eq!(self.audio_metadata.sample_rate, resampled.rate());
+
+            return Some(SampleIter {
+                audio: resampled,
+                sample_idx: 0,
+            });
+        }
+        None
     }
 }
 
